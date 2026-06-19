@@ -10,6 +10,7 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #121214; }
         ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 4px; }
+        .drag-over { border-color: #4f46e5 !important; background-color: rgba(79, 70, 229, 0.05) !important; }
     </style>
 </head>
 <body class="bg-[#0f0f11] text-gray-100 font-sans antialiased min-h-screen flex">
@@ -49,7 +50,6 @@
     </aside>
 
     <main class="flex-1 flex flex-col min-h-screen min-w-0">
-        
         <div id="header-banner" class="w-full h-44 bg-cover bg-center relative border-b border-[#222226]" 
              style="background-image: url('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=1200');">
             <div class="absolute inset-0 bg-gradient-to-t from-[#0f0f11] via-[#0f0f11]/40 to-transparent"></div>
@@ -120,7 +120,7 @@
 
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">URL de Miniatura / Preview (Opcional)</label>
-                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/... o enlace directo" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
+                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
 
             <button onclick="guardarTarea()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/20 transition cursor-pointer">
@@ -156,7 +156,6 @@
 
         let tableroActualId = null;
 
-        // Iniciar de forma controlada una vez cargada la ventana
         window.addEventListener('DOMContentLoaded', async () => {
             configurarAnunciosEstaticos();
             await cargarEspaciosDeTrabajo();
@@ -179,10 +178,7 @@
                 .select('*')
                 .order('created_at', { ascending: true });
 
-            if (error) {
-                console.error("Error cargando tableros:", error);
-                return;
-            }
+            if (error) return console.error("Error cargando tableros:", error);
 
             if (!tableros || tableros.length === 0) {
                 const { data: inicial } = await supabaseClient.from('tableros').insert([{ titulo: "Producción Audiovisual", descripcion: "Control general" }]).select();
@@ -205,7 +201,7 @@
                 }
 
                 lista.innerHTML += `
-                    <button onclick="cambiarTablero('${tab.id}', '${tab.titulo}', '${icono}')" class="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-sm font-medium transition cursor-pointer ${esActivo ? 'bg-[#222226] text-indigo-400' : 'text-gray-400 hover:bg-[#1a1a1e] hover:text-gray-200'}">
+                    <button onclick="cambiarTablero('${tab.id}')" class="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-sm font-medium transition cursor-pointer ${esActivo ? 'bg-[#222226] text-indigo-400' : 'text-gray-400 hover:bg-[#1a1a1e] hover:text-gray-200'}">
                         <span>${icono}</span> ${tab.titulo}
                     </button>
                 `;
@@ -225,7 +221,7 @@
             }
         }
 
-        async function cambiarTablero(id, titulo, icono) {
+        async function cambiarTablero(id) {
             tableroActualId = id;
             await cargarEspaciosDeTrabajo();
         }
@@ -266,12 +262,14 @@
                         if(tarea.prioridad === 'Alta') badgeColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
                         if(tarea.prioridad === 'Urgente') badgeColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
 
-                        // Responsable asignado o por defecto
                         const responsable = tarea.responsable || "Lider Media";
 
                         htmlTareas += `
-                            <div class="bg-[#161619] border border-[#222226] p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3">
-                                ${tarea.miniatura_url ? `<img src="${tarea.miniatura_url}" class="w-full h-28 object-cover rounded-lg border border-[#222226]" />` : ''}
+                            <div id="tarea-${tarea.id}" 
+                                 draggable="true" 
+                                 ondragstart="handleDragStart(event, '${tarea.id}')"
+                                 class="bg-[#161619] border border-[#222226] p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3 cursor-grab active:cursor-grabbing select-none">
+                                ${tarea.miniatura_url ? `<img src="${tarea.miniatura_url}" class="w-full h-28 object-cover rounded-lg border border-[#222226]" draggable="false" />` : ''}
                                 <h4 class="font-medium text-xs text-gray-200 group-hover:text-white leading-tight">${tarea.titulo}</h4>
                                 <div class="flex items-center justify-between pt-1">
                                     <span class="text-[9px] px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${tarea.prioridad}</span>
@@ -280,11 +278,15 @@
                             </div>`;
                     });
                 } else {
-                    htmlTareas = `<div class="text-[11px] text-gray-600 text-center py-6 border border-dashed border-[#1c1c21] rounded-xl select-none">No hay asignaciones</div>`;
+                    htmlTareas = `<div class="text-[11px] text-gray-600 text-center py-6 border border-dashed border-[#1c1c21]/40 rounded-xl select-none empty-state-msg">No hay asignaciones</div>`;
                 }
 
                 contenedor.innerHTML += `
-                    <div class="w-72 shrink-0 flex flex-col max-h-[calc(100vh-280px)] bg-[#121214]/60 p-4 rounded-xl border border-[#1c1c21]">
+                    <div class="w-72 shrink-0 flex flex-col max-h-[calc(100vh-280px)] bg-[#121214]/60 p-4 rounded-xl border border-[#1c1c21] transition-all duration-200"
+                         data-columna-id="${col.id}"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event, '${col.id}')">
                         <div class="flex justify-between items-center mb-3">
                             <div class="flex items-center gap-2">
                                 <h3 class="font-semibold text-xs tracking-wide text-gray-300">${col.nombre}</h3>
@@ -292,10 +294,62 @@
                             </div>
                             <button onclick="abrirModalTarea('${col.id}')" class="text-gray-500 hover:text-white transition text-sm p-1 font-bold cursor-pointer">＋</button>
                         </div>
-                        <div class="space-y-3 overflow-y-auto pr-1 flex-1">
+                        <div class="space-y-3 overflow-y-auto pr-1 flex-1 lista-tareas-contenedor">
                             ${htmlTareas}
                         </div>
                     </div>`;
+            }
+        }
+
+        /* 🎛️ MANEJADORES DRAG AND DROP */
+        function handleDragStart(event, tareaId) {
+            event.dataTransfer.setData("text/plain", tareaId);
+            event.dropEffect = "move";
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            const colContenedor = event.currentTarget;
+            if (!colContenedor.classList.contains('drag-over')) {
+                colContenedor.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        async function handleDrop(event, destinoColumnaId) {
+            event.preventDefault();
+            const colContenedor = event.currentTarget;
+            colContenedor.classList.remove('drag-over');
+            
+            const tareaId = event.dataTransfer.getData("text/plain");
+            if (!tareaId) return;
+
+            // Encontrar la tarjeta en el DOM para movimiento visual inmediato (Optimistic UI)
+            const tarjetaDOM = document.getElementById(`tarea-${tareaId}`);
+            if (!tarjetaDOM) return;
+
+            const contenedorDestino = colContenedor.querySelector('.lista-tareas-contenedor');
+            const msgVacio = contenedorDestino.querySelector('.empty-state-msg');
+            if (msgVacio) msgVacio.remove();
+
+            contenedorDestino.appendChild(tarjetaDOM);
+
+            // Actualizar la columna en Supabase
+            const { error } = await supabaseClient
+                .from('tareas')
+                .update({ segmento_id: destinoColumnaId })
+                .eq('id', tareaId);
+
+            if (error) {
+                console.error("Error al mover tarea en Supabase:", error);
+                alert("No se pudo sincronizar el movimiento.");
+                await cargarColumnasYTasks(); // Revertir cambios si hay error
+            } else {
+                // Refrescar contadores e interfaz de manera limpia
+                await cargarColumnasYTasks();
             }
         }
 
@@ -329,8 +383,6 @@
 
             if(!titulo) return alert("Por favor escribe el título de la tarea");
 
-            // Nota: Si no tienes la columna 'responsable' creada textualmente en tu Supabase, se guardará igual en el objeto.
-            // Para asegurar compatibilidad total, la renderizamos directo.
             await supabaseClient.from('tareas').insert([{
                 segmento_id: segmentoId,
                 titulo: titulo,
@@ -349,8 +401,6 @@
         
         async function guardarEspacio() {
             const titulo = document.getElementById('espacio-titulo').value;
-            const icono = document.getElementById('espacio-icono').value || '🎛️';
-
             if(!titulo) return alert("Escribe el nombre del espacio");
 
             const { data, error } = await supabaseClient.from('tableros').insert([{
@@ -358,17 +408,13 @@
                 descripcion: `Mesa de trabajo para ${titulo}`
             }]).select();
 
-            if (error) {
-                alert("Error al guardar espacio. Verifica tu base de datos.");
-                return;
-            }
+            if (error) return alert("Error al guardar espacio.");
 
             cerrarModalEspacio();
-            await cargarEspaciosDeTrabajo();
             if(data && data[0]) {
                 tableroActualId = data[0].id;
-                await cargarEspaciosDeTrabajo();
             }
+            await cargarEspaciosDeTrabajo();
         }
     </script>
 </body>
