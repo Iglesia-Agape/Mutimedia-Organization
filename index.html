@@ -240,7 +240,7 @@
         window.addEventListener('DOMContentLoaded', async () => {
             await cargarAnunciosDesdeSupabase();
             await sincronizarMiembrosYSelects();
-            await cargarEspacios DeTrabajo();
+            await cargarEspaciosDeTrabajo();
         });
 
         /* 📨 SERVICIO AUTOMÁTICO DE NOTIFICACIONES POR CORREO (RESEND API) */
@@ -641,7 +641,6 @@
 
         /* 🛠️ AUXILIARES */
         async function inicializarColumnasEspacio() {
-            // Corregido "name" por "nombre" para consistencia con Supabase
             await supabaseClient.from('segmentos').insert([
                 { tablero_id: tableroActualId, nombre: "📋 Por Hacer", posicion: 1 },
                 { tablero_id: tableroActualId, nombre: "🎬 En Proceso", posicion: 2 },
