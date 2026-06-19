@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* Estilos de scroll integrados estilo suite de edición */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #121214; }
         ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 4px; }
@@ -60,7 +61,7 @@
                 <div class="w-16 h-16 bg-[#161619] border-2 border-[#222226] rounded-2xl flex items-center justify-center text-3xl shadow-xl select-none" id="tablero-icono">🎬</div>
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-white mb-0.5" id="tablero-titulo">Producción Audiovisual</h1>
-                    <p class="text-xs text-gray-400" id="tablero-descripcion">Gestión integrada de proyectos y control cruzado.</p>
+                    <p class="text-xs text-gray-400" id="tablero-descripcion">Gestión integrada de proyectos y control cruzado en tiempo real.</p>
                 </div>
             </div>
             
@@ -87,7 +88,7 @@
             
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Título de la asignación</label>
-                <input type="text" id="form-titulo" placeholder="Ej. Mezclar audio de voces dominicales" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
+                <input type="text" id="form-titulo" placeholder="Ej. Mezclar voces del servicio de adoración" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -111,20 +112,18 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Fecha límite</label>
-                    <input type="date" id="form-fecha" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-300">
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Fecha límite de entrega</label>
+                <input type="date" id="form-fecha" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-300">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">URL de Miniatura / Preview (Opcional)</label>
-                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">URL de Miniatura / Imagen Preview (Opcional)</label>
+                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/... o enlace de Drive" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
 
             <button onclick="guardarTarea()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/20 transition cursor-pointer">
-                🚀 Desplegar Tarea
+                🚀 Desplegar Asignación
             </button>
         </div>
     </div>
@@ -140,11 +139,11 @@
                 <input type="text" id="espacio-titulo" placeholder="Ej. Audio, Redes Sociales" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Icono (Emoji)</label>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Icono representativo (Emoji)</label>
                 <input type="text" id="espacio-icono" placeholder="🎛️" value="🎛️" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm text-center focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
             <button onclick="guardarEspacio()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer">
-                ✨ Crear Espacio
+                ✨ Crear Nuevo Espacio
             </button>
         </div>
     </div>
@@ -156,6 +155,7 @@
 
         let tableroActualId = null;
 
+        // Carga sincronizada al iniciar la ventana
         window.addEventListener('DOMContentLoaded', async () => {
             configurarAnunciosEstaticos();
             await cargarEspaciosDeTrabajo();
@@ -301,7 +301,7 @@
             }
         }
 
-        /* 🎛️ MANEJADORES DRAG AND DROP */
+        /* 🎛️ MANEJADORES DRAG AND DROP OPTIMIZADOS */
         function handleDragStart(event, tareaId) {
             event.dataTransfer.setData("text/plain", tareaId);
             event.dropEffect = "move";
@@ -327,17 +327,20 @@
             const tareaId = event.dataTransfer.getData("text/plain");
             if (!tareaId) return;
 
-            // Encontrar la tarjeta en el DOM para movimiento visual inmediato (Optimistic UI)
             const tarjetaDOM = document.getElementById(`tarea-${tareaId}`);
             if (!tarjetaDOM) return;
 
             const contenedorDestino = colContenedor.querySelector('.lista-tareas-contenedor');
-            const msgVacio = contenedorDestino.querySelector('.empty-state-msg');
-            if (msgVacio) msgVacio.remove();
+            
+            // CORRECCIÓN VISUAL: Remover el mensaje "No hay asignaciones" de manera efectiva al soltar una tarea
+            const msgVacio = contenedorDestino.querySelector('.empty-state-msg'); 
+            if (msgVacio) {
+                msgVacio.remove();
+            }
 
             contenedorDestino.appendChild(tarjetaDOM);
 
-            // Actualizar la columna en Supabase
+            // Sincronizar movimiento en Supabase
             const { error } = await supabaseClient
                 .from('tareas')
                 .update({ segmento_id: destinoColumnaId })
@@ -346,10 +349,9 @@
             if (error) {
                 console.error("Error al mover tarea en Supabase:", error);
                 alert("No se pudo sincronizar el movimiento.");
-                await cargarColumnasYTasks(); // Revertir cambios si hay error
+                await cargarColumnasYTasks(); 
             } else {
-                // Refrescar contadores e interfaz de manera limpia
-                await cargarColumnasYTasks();
+                await cargarColumnasYTasks(); // Actualiza contadores numéricos limpiamente
             }
         }
 
