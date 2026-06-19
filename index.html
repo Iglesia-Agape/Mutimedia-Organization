@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Estilo de scroll personalizado para que combine con la suite de edición */
+        /* Estilo de scroll personalizado estilo suite de edición */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #1e1e2e; }
         ::-webkit-scrollbar-thumb { background: #3a3a50; border-radius: 4px; }
@@ -68,22 +68,26 @@
             </div>
         </section>
     </main>
-<script>
+
+    <script>
+        // Inicializar credenciales
         const SUPABASE_URL = "https://cpyueytgzapjguyoigsg.supabase.co";
         const SUPABASE_KEY = "sb_publishable_vXcdkr57ii27XkLuJHIK3A_rP2qYkrL";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Usamos un nombre único para evitar conflictos con el objeto global de la librería
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function cargarTablero() {
             const contenedor = document.getElementById('tablero-columnas');
             
             try {
-                // Consultar segmentos
-                let { data: segmentos, error: errSeg } = await supabase
+                // Consultar segmentos usando el cliente corregido
+                let { data: segmentos, error: errSeg } = await supabaseClient
                     .from('segmentos')
                     .select('*')
                     .order('posicion', { ascending: true });
 
-                // Forzar inicialización si da error de RLS o si está vacío
+                // Si da error o está vacío, muestra la opción de inicializar columnas por defecto
                 if (errSeg || !segmentos || segmentos.length === 0) {
                     console.log("Inicializando o recuperando de estado vacío...");
                     contenedor.innerHTML = `
@@ -98,8 +102,9 @@
 
                 contenedor.innerHTML = '';
 
+                // Renderizar cada segmento y sus tareas asociadas
                 for (const col of segmentos) {
-                    const { data: tareas } = await supabase
+                    const { data: tareas } = await supabaseClient
                         .from('tareas')
                         .select('*')
                         .eq('segmento_id', col.id)
@@ -142,22 +147,24 @@
                 }
 
             } catch (error) {
-                console.error("Error crítico:", error);
+                console.error("Error crítico en la interfaz:", error);
             }
         }
 
         async function crearColumnasPorDefecto() {
             let tableroId;
-            const { data: tableros } = await supabase.from('tableros').select('id').limit(1);
+            // Verificar si ya existe un contenedor de tablero general
+            const { data: tableros } = await supabaseClient.from('tableros').select('id').limit(1);
             
             if (tableros && tableros.length > 0) {
                 tableroId = tableros[0].id;
             } else {
-                const { data: nuevoTab } = await supabase.from('tableros').insert([{ titulo: "Producción Audiovisual Principal" }]).select();
+                const { data: nuevoTab } = await supabaseClient.from('tableros').insert([{ titulo: "Producción Audiovisual Principal" }]).select();
                 tableroId = nuevoTab[0].id;
             }
 
-            await supabase.from('segmentos').insert([
+            // Inyectar los segmentos por defecto para el equipo multimedia
+            await supabaseClient.from('segmentos').insert([
                 { tablero_id: tableroId, nombre: "📋 Por Empezar", posicion: 1 },
                 { tablero_id: tableroId, nombre: "🎬 En Edición", posicion: 2 },
                 { tablero_id: tableroId, nombre: "🚀 En Render / Revisión", posicion: 3 }
@@ -166,5 +173,8 @@
             cargarTablero();
         }
 
+        // Cargar el flujo de trabajo al abrir el documento
         window.onload = cargarTablero;
     </script>
+</body>
+</html>
