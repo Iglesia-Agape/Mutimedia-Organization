@@ -7,11 +7,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Estilos de scroll integrados estilo suite de edición */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #121214; }
         ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 4px; }
         .drag-over { border-color: #4f46e5 !important; background-color: rgba(79, 70, 229, 0.05) !important; }
+        .dragging { opacity: 0.5; cursor: grabbing !important; }
     </style>
 </head>
 <body class="bg-[#0f0f11] text-gray-100 font-sans antialiased min-h-screen flex">
@@ -23,12 +23,17 @@
                 <span class="font-semibold text-base tracking-wide text-gray-200">Ministerio Media</span>
             </div>
             
-            <div class="mb-6 bg-[#1c1c21] border border-[#2a2a33] rounded-xl p-3">
-                <div class="flex items-center gap-2 mb-1.5">
-                    <span class="text-xs">📢</span>
-                    <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Tablón de Anuncios</p>
+            <div class="mb-6 bg-[#1c1c21] border border-[#2a2a33] rounded-xl p-3 relative group">
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs">📢</span>
+                        <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Tablón de Anuncios</p>
+                    </div>
+                    <button onclick="crearAnuncio()" class="text-gray-500 hover:text-indigo-400 text-[11px] font-bold cursor-pointer opacity-0 group-hover:opacity-100 transition">＋</button>
                 </div>
-                <p id="texto-anuncio" class="text-xs text-gray-400 leading-relaxed italic">Cargando anuncios del equipo...</p>
+                <div id="contenedor-anuncios" class="space-y-2 max-h-32 overflow-y-auto pr-1">
+                    <p id="texto-anuncio" class="text-xs text-gray-400 leading-relaxed italic">Cargando anuncios oficiales...</p>
+                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto pr-1">
@@ -66,8 +71,8 @@
             </div>
             
             <div class="flex items-center gap-2 bg-[#161619] border border-[#222226] rounded-lg p-1 text-xs">
-                <button class="px-3 py-1.5 font-medium rounded-md bg-[#222226] text-indigo-400 shadow-sm">Todo</button>
-                <button class="px-3 py-1.5 font-medium rounded-md text-gray-400 hover:text-white transition">Asignados</button>
+                <button id="filtro-todo" onclick="cambiarFiltro('todo')" class="px-3 py-1.5 font-medium rounded-md bg-[#222226] text-indigo-400 shadow-sm cursor-pointer transition">Todo</button>
+                <button id="filtro-asignados" onclick="cambiarFiltro('asignados')" class="px-3 py-1.5 font-medium rounded-md text-gray-400 hover:text-white cursor-pointer transition">Asignados</button>
             </div>
         </header>
 
@@ -119,7 +124,7 @@
 
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">URL de Miniatura / Imagen Preview (Opcional)</label>
-                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/... o enlace de Drive" class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
+                <input type="url" id="form-miniatura" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200">
             </div>
 
             <button onclick="guardarTarea()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/20 transition cursor-pointer">
@@ -154,22 +159,82 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let tableroActualId = null;
+        let filtroActual = 'todo'; // 'todo' o 'asignados'
+        const OPERADOR_ACTUAL = "René Raudales";
 
-        // Carga sincronizada al iniciar la ventana
         window.addEventListener('DOMContentLoaded', async () => {
-            configurarAnunciosEstaticos();
+            await cargarAnunciosDesdeSupabase();
             await cargarEspaciosDeTrabajo();
         });
 
-        function configurarAnunciosEstaticos() {
-            const anuncios = [
-                "📢 Recordatorio: El streaming del domingo inicia pruebas a las 7:30 AM. ¡Puntuales!",
-                "📢 Diseño: Ya están listos los vectores para las pantallas led en el Drive.",
-                "📢 Audio: Limpieza general de consolas y cables este sábado por la tarde."
-            ];
-            document.getElementById('texto-anuncio').innerText = anuncios[Math.floor(Math.random() * anuncios.length)];
+        /* 📢 SECCIÓN DE ANUNCIOS DINÁMICOS */
+        async function cargarAnunciosDesdeSupabase() {
+            const contenedor = document.getElementById('contenedor-anuncios');
+            
+            const { data: anuncios, error } = await supabaseClient
+                .from('anuncios')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                // Si la tabla no existe, dar opción amigable de crearla
+                contenedor.innerHTML = `
+                    <div class="text-center p-1 bg-indigo-950/20 rounded border border-indigo-500/10">
+                        <p class="text-[10px] text-gray-400 mb-1">¿Activar anuncios en la BD?</p>
+                        <button onclick="inicializarTablaAnunciosSQL()" class="text-[9px] bg-indigo-600 text-white px-2 py-0.5 rounded cursor-pointer hover:bg-indigo-500">Activar</button>
+                    </div>`;
+                return;
+            }
+
+            if (!anuncios || anuncios.length === 0) {
+                contenedor.innerHTML = `<p class="text-xs text-gray-500 italic">No hay anuncios recientes.</p>`;
+                return;
+            }
+
+            contenedor.innerHTML = '';
+            anuncios.forEach(anuncio => {
+                contenedor.innerHTML += `
+                    <div class="border-b border-[#222226] last:border-0 pb-1.5 last:pb-0 relative group/msg">
+                        <p class="text-xs text-gray-300 leading-relaxed">${anuncio.contenido}</p>
+                        <button onclick="eliminarAnuncio('${anuncio.id}')" class="absolute top-0 right-0 text-gray-600 hover:text-rose-400 text-[9px] opacity-0 group-hover/msg:opacity-100 cursor-pointer transition">✕</button>
+                    </div>`;
+            });
         }
 
+        async function crearAnuncio() {
+            const contenido = prompt("Escribe el nuevo anuncio para el equipo:");
+            if (!contenido) return;
+
+            await supabaseClient.from('anuncios').insert([{ contenido: contenido }]);
+            await cargarAnunciosDesdeSupabase();
+        }
+
+        async function eliminarAnuncio(id) {
+            await supabaseClient.from('anuncios').delete().eq('id', id);
+            await cargarAnunciosDesdeSupabase();
+        }
+
+        function inicializarTablaAnunciosSQL() {
+            alert("Para activar la tabla de anuncios ejecuta el código SQL que te dejaré en el chat dentro del SQL Editor de Supabase.");
+        }
+
+        /* 👥 LÓGICA DE FILTRADO FUNCIONAL */
+        function cambiarFiltro(tipo) {
+            filtroActual = tipo;
+            const btnTodo = document.getElementById('filtro-todo');
+            const btnAsignados = document.getElementById('filtro-asignados');
+
+            if (tipo === 'todo') {
+                btnTodo.className = "px-3 py-1.5 font-medium rounded-md bg-[#222226] text-indigo-400 shadow-sm cursor-pointer transition";
+                btnAsignados.className = "px-3 py-1.5 font-medium rounded-md text-gray-400 hover:text-white cursor-pointer transition";
+            } else {
+                btnAsignados.className = "px-3 py-1.5 font-medium rounded-md bg-[#222226] text-indigo-400 shadow-sm cursor-pointer transition";
+                btnTodo.className = "px-3 py-1.5 font-medium rounded-md text-gray-400 hover:text-white cursor-pointer transition";
+            }
+            cargarColumnasYTasks();
+        }
+
+        /* 🎨 MANEJO DE ESPACIOS DE TRABAJO */
         async function cargarEspaciosDeTrabajo() {
             const lista = document.getElementById('lista-espacios');
             
@@ -226,6 +291,7 @@
             await cargarEspaciosDeTrabajo();
         }
 
+        /* 🛠️ RENDERIZADO DE KANBAN Y FILTROS */
         async function cargarColumnasYTasks() {
             const contenedor = document.getElementById('tablero-columnas');
             
@@ -249,11 +315,14 @@
             contenedor.innerHTML = '';
 
             for (const col of segmentos) {
-                const { data: tareas } = await supabaseClient
-                    .from('tareas')
-                    .select('*')
-                    .eq('segmento_id', col.id)
-                    .order('posicion', { ascending: true });
+                let query = supabaseClient.from('tareas').select('*').eq('segmento_id', col.id);
+                
+                // Aplicar filtro de asignados si está activo
+                if (filtroActual === 'asignados') {
+                    query = query.eq('responsable', OPERADOR_ACTUAL);
+                }
+
+                const { data: tareas } = await query.order('posicion', { ascending: true });
 
                 let htmlTareas = '';
                 if (tareas && tareas.length > 0) {
@@ -268,9 +337,13 @@
                             <div id="tarea-${tarea.id}" 
                                  draggable="true" 
                                  ondragstart="handleDragStart(event, '${tarea.id}')"
-                                 class="bg-[#161619] border border-[#222226] p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3 cursor-grab active:cursor-grabbing select-none">
+                                 ondragend="handleDragEnd(event)"
+                                 class="bg-[#161619] border border-[#222226] p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3 cursor-grab active:cursor-grabbing select-none relative">
+                                
+                                <button onclick="eliminarTarea('${tarea.id}')" class="absolute top-3 right-3 text-gray-500 hover:text-rose-500 transition font-bold text-xs cursor-pointer opacity-0 group-hover:opacity-100 z-20">✕</button>
+                                
                                 ${tarea.miniatura_url ? `<img src="${tarea.miniatura_url}" class="w-full h-28 object-cover rounded-lg border border-[#222226]" draggable="false" />` : ''}
-                                <h4 class="font-medium text-xs text-gray-200 group-hover:text-white leading-tight">${tarea.titulo}</h4>
+                                <h4 class="font-medium text-xs text-gray-200 group-hover:text-white leading-tight pr-4">${tarea.titulo}</h4>
                                 <div class="flex items-center justify-between pt-1">
                                     <span class="text-[9px] px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${tarea.prioridad}</span>
                                     <span class="text-[10px] text-gray-400 font-medium bg-[#1c1c21] px-2 py-0.5 rounded border border-[#26262b]">👤 ${responsable}</span>
@@ -301,10 +374,15 @@
             }
         }
 
-        /* 🎛️ MANEJADORES DRAG AND DROP OPTIMIZADOS */
+        /* 🎛️ DRAG AND DROP CON CAMBIO DE CURSOR */
         function handleDragStart(event, tareaId) {
             event.dataTransfer.setData("text/plain", tareaId);
             event.dropEffect = "move";
+            document.getElementById(`tarea-${tareaId}`).classList.add('dragging');
+        }
+
+        function handleDragEnd(event) {
+            event.currentTarget.classList.remove('dragging');
         }
 
         function handleDragOver(event) {
@@ -332,29 +410,32 @@
 
             const contenedorDestino = colContenedor.querySelector('.lista-tareas-contenedor');
             
-            // CORRECCIÓN VISUAL: Remover el mensaje "No hay asignaciones" de manera efectiva al soltar una tarea
             const msgVacio = contenedorDestino.querySelector('.empty-state-msg'); 
-            if (msgVacio) {
-                msgVacio.remove();
-            }
+            if (msgVacio) msgVacio.remove();
 
             contenedorDestino.appendChild(tarjetaDOM);
 
-            // Sincronizar movimiento en Supabase
             const { error } = await supabaseClient
                 .from('tareas')
                 .update({ segmento_id: destinoColumnaId })
                 .eq('id', tareaId);
 
             if (error) {
-                console.error("Error al mover tarea en Supabase:", error);
-                alert("No se pudo sincronizar el movimiento.");
+                console.error(error);
                 await cargarColumnasYTasks(); 
             } else {
-                await cargarColumnasYTasks(); // Actualiza contadores numéricos limpiamente
+                await cargarColumnasYTasks();
             }
         }
 
+        /* 🗑️ ELIMINAR TAREA */
+        async function eliminarTarea(id) {
+            if(!confirm("¿Seguro que deseas eliminar esta asignación?")) return;
+            await supabaseClient.from('tareas').delete().eq('id', id);
+            await cargarColumnasYTasks();
+        }
+
+        /* 🛠️ FUNCIONES AUXILIARES */
         async function inicializarColumnasEspacio() {
             await supabaseClient.from('segmentos').insert([
                 { tablero_id: tableroActualId, nombre: "📋 Por Hacer", posicion: 1 },
