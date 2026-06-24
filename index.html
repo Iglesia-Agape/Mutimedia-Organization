@@ -934,7 +934,17 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, () => {
                     if (Date.now() < suprimirRealtimeTareasHasta) return;
                     clearTimeout(debounceTareas);
-                    debounceTareas = setTimeout(() => { if (tableroActualId) cargarColumnasYTasks(); }, 300);
+                    debounceTareas = setTimeout(() => {
+                        if (tableroActualId) cargarColumnasYTasks();
+                        // Si el modal de configuración está abierto, sus secciones de
+                        // auditoría y métricas generales también dependen de la tabla
+                        // "tareas" y deben refrescarse aunque no haya tablero activo visible.
+                        const modalConfig = document.getElementById('modal-configuracion');
+                        if (modalConfig && modalConfig.classList.contains('modal-visible')) {
+                            cargarMetricaGeneralEquipo();
+                            if (esLider()) cargarTareasEliminadas();
+                        }
+                    }, 300);
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'segmentos' }, () => {
                     if (Date.now() < suprimirRealtimeTareasHasta) return;
