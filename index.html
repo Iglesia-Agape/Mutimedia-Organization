@@ -135,7 +135,7 @@
                         <span class="text-xs">📢</span>
                         <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Tablón de Anuncios</p>
                     </div>
-                    <button id="boton-crear-anuncio" onclick="abrirModalAnuncio()" class="hidden text-gray-500 hover:text-indigo-400 text-[11px] font-bold cursor-pointer opacity-0 group-hover:opacity-100 transition">＋</button>
+                    <button id="boton-crear-anuncio" onclick="abrirModalAnuncio()" class="hidden w-5 h-5 rounded-md bg-[#1c1c21] border border-[#2a2a33] hover:border-indigo-500/40 hover:text-indigo-400 text-gray-400 text-xs font-bold cursor-pointer transition inline-flex items-center justify-center">＋</button>
                 </div>
                 <div id="contenedor-anuncios" class="space-y-2 max-h-32 overflow-y-auto pr-1">
                     <p id="texto-anuncio" class="text-xs text-gray-400 leading-relaxed italic">Cargando anuncios oficiales...</p>
@@ -936,7 +936,7 @@
             contenedor.innerHTML = anuncios.map(a => `
                 <div class="border-b border-[#222226] last:border-0 pb-1.5 last:pb-0 relative group/msg">
                     <p class="text-xs text-gray-300 leading-relaxed">${a.contenido}</p>
-                    ${esLider() ? `<button onclick="eliminarAnuncio('${a.id}')" class="absolute top-0 right-0 text-gray-600 hover:text-rose-400 text-[9px] opacity-0 group-hover/msg:opacity-100 cursor-pointer transition">✕</button>` : ''}
+                    ${esLider() ? `<button onclick="eliminarAnuncio('${a.id}')" class="absolute top-0 right-0 text-gray-600 hover:text-rose-400 text-[10px] cursor-pointer transition px-1">✕</button>` : ''}
                 </div>`).join('');
         }
 
@@ -1474,9 +1474,25 @@
                 await supabaseClient.from('eventos').update({ titulo, fecha, hora, ubicacion, descripcion }).eq('id', id);
             } else {
                 await supabaseClient.from('eventos').insert([{ titulo, fecha, hora, ubicacion, descripcion, creado_por: OPERADOR_ACTUAL }]);
+                await notificarEventoATodos(titulo, fecha);
             }
             document.getElementById('modal-evento').classList.add('hidden');
             renderizarCalendario();
+        }
+
+        // Avisa a todo el equipo (excepto a quien lo creó) cuando se agenda un evento nuevo.
+        async function notificarEventoATodos(titulo, fecha) {
+            const [y, m, d] = fecha.split('-');
+            const tituloNotificacion = `📅 Nuevo evento: ${titulo} (${d}/${m}/${y})`;
+            const destinatarios = cacheMiembros.filter(m => m.activo !== false && m.user_id && m.nombre !== OPERADOR_ACTUAL);
+            if (destinatarios.length === 0) return;
+
+            const filas = destinatarios.map(m => ({
+                miembro_user_id: m.user_id,
+                tarea_id: null,
+                tarea_titulo: tituloNotificacion
+            }));
+            await supabaseClient.from('notificaciones').insert(filas);
         }
 
         async function eliminarEvento() {
@@ -1872,7 +1888,7 @@
 
             lista.innerHTML = notis.map(n => `
                 <div onclick="marcarNotificacionLeida('${n.id}')" class="p-3 cursor-pointer hover:bg-[#1c1c21] transition ${n.leida ? 'opacity-50' : ''}">
-                    <p class="text-xs text-gray-200">Se te asignó: <span class="font-semibold">${n.tarea_titulo}</span></p>
+                    <p class="text-xs text-gray-200">${n.tarea_id ? `Se te asignó: <span class="font-semibold">${n.tarea_titulo}</span>` : `<span class="font-semibold">${n.tarea_titulo}</span>`}</p>
                     <p class="text-[10px] text-gray-500 mt-1">${new Date(n.created_at).toLocaleString('es-HN', { dateStyle: 'short', timeStyle: 'short' })}</p>
                 </div>`).join('');
         }
