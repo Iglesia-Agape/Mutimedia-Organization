@@ -21,6 +21,69 @@
         ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 4px; }
         .drag-over { border-color: #4f46e5 !important; background-color: rgba(79, 70, 229, 0.05) !important; }
         .dragging { opacity: 0.5; cursor: grabbing !important; }
+
+        /* --- Fase 2: transiciones y microinteracciones --- */
+
+        /* Entrada/salida de tarjetas de tarea */
+        @keyframes tarjeta-entrada {
+            from { opacity: 0; transform: translateY(6px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tarea-card { animation: tarjeta-entrada 0.18s ease-out; }
+        .tarea-card.saliendo {
+            opacity: 0;
+            transform: scale(0.96);
+            transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+        }
+
+        /* Modales: fade + scale en vez de aparición instantánea con `hidden` */
+        .modal-overlay {
+            transition: opacity 0.18s ease-out;
+            opacity: 0;
+        }
+        .modal-overlay.modal-visible { opacity: 1; }
+        .modal-overlay .modal-panel {
+            transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+            opacity: 0;
+            transform: translateY(8px) scale(0.97);
+        }
+        .modal-overlay.modal-visible .modal-panel {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        /* Mientras transiciona hacia "hidden", debe seguir pintándose */
+        .modal-overlay.cerrando { display: flex !important; }
+
+        /* Estado de carga para botones async (evita doble clic / doble insert) */
+        button[disabled] { opacity: 0.6; cursor: not-allowed !important; }
+        .btn-spinner {
+            display: inline-block; width: 12px; height: 12px;
+            border: 2px solid currentColor; border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+            margin-right: 6px; vertical-align: -2px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Fase 4: accesibilidad --- */
+
+        /* Foco visible y consistente para navegación por teclado */
+        button:focus-visible, a:focus-visible, input:focus-visible,
+        select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* Tarjeta de tarea enfocable por teclado (alternativa a drag&drop) */
+        .tarea-card:focus-visible { outline: 2px solid #6366f1; outline-offset: 1px; }
+
+        /* Respeta preferencia de movimiento reducido */
+        @media (prefers-reduced-motion: reduce) {
+            .tarea-card, .tarea-card.saliendo, .modal-overlay, .modal-overlay .modal-panel {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-[#0f0f11] text-gray-100 font-sans antialiased min-h-screen flex">
@@ -310,11 +373,11 @@
     </main>
 
     <!-- MODAL: Eventos de un día específico -->
-    <div id="modal-dia-eventos" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4 max-h-[80vh] flex flex-col">
+    <div id="modal-dia-eventos" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-dia-titulo">
+        <div class="modal-panel bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4 max-h-[80vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3 shrink-0">
                 <h3 id="modal-dia-titulo" class="font-bold text-gray-200 text-base">Eventos</h3>
-                <button onclick="document.getElementById('modal-dia-eventos').classList.add('hidden')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
+                <button onclick="cerrarModal('modal-dia-eventos')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
             </div>
             <div id="modal-dia-lista" class="space-y-2 overflow-y-auto flex-1"></div>
             <button id="modal-dia-boton-agregar" onclick="abrirModalEvento(null)" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer shrink-0">
@@ -324,11 +387,11 @@
     </div>
 
     <!-- MODAL: Crear/Editar Evento -->
-    <div id="modal-evento" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#26262b] w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+    <div id="modal-evento" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-evento-titulo-header">
+        <div class="modal-panel bg-[#161619] border border-[#26262b] w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3">
                 <h3 id="modal-evento-titulo-header" class="font-bold text-gray-200 text-base flex items-center gap-2">📅 Nuevo Evento</h3>
-                <button onclick="document.getElementById('modal-evento').classList.add('hidden')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
+                <button onclick="cerrarModal('modal-evento')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
             </div>
             <input type="hidden" id="evento-id">
             <div>
@@ -362,8 +425,8 @@
         </div>
     </div>
 
-    <div id="modal-tarea" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#26262b] w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+    <div id="modal-tarea" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-tarea-titulo-header">
+        <div class="modal-panel bg-[#161619] border border-[#26262b] w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3">
                 <h3 id="modal-tarea-titulo-header" class="font-bold text-gray-200 text-base flex items-center gap-2">📝 Nueva Asignación</h3>
                 <button onclick="cerrarModalTarea()" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
@@ -416,10 +479,10 @@
         </div>
     </div>
 
-    <div id="modal-espacio" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#26262b] w-full max-w-sm rounded-xl p-6 shadow-2xl space-y-4">
+    <div id="modal-espacio" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-espacio-titulo">
+        <div class="modal-panel bg-[#161619] border border-[#26262b] w-full max-w-sm rounded-xl p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3">
-                <h3 class="font-bold text-gray-200 text-base">🎨 Crear Espacio de Trabajo</h3>
+                <h3 id="modal-espacio-titulo" class="font-bold text-gray-200 text-base">🎨 Crear Espacio de Trabajo</h3>
                 <button onclick="cerrarModalEspacio()" class="text-gray-500 hover:text-white cursor-pointer">✕</button>
             </div>
             <div>
@@ -436,10 +499,10 @@
         </div>
     </div>
 
-    <div id="modal-configuracion" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#26262b] w-full max-w-4xl rounded-xl p-6 shadow-2xl flex flex-col max-h-[88vh]">
+    <div id="modal-configuracion" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-configuracion-titulo">
+        <div class="modal-panel bg-[#161619] border border-[#26262b] w-full max-w-4xl rounded-xl p-6 shadow-2xl flex flex-col max-h-[88vh]">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3 shrink-0">
-                <h3 class="font-bold text-gray-200 text-base flex items-center gap-2">⚙️ Configuración del Ministerio</h3>
+                <h3 id="modal-configuracion-titulo" class="font-bold text-gray-200 text-base flex items-center gap-2">⚙️ Configuración del Ministerio</h3>
                 <button onclick="cerrarModalConfiguracion()" class="text-gray-500 hover:text-white cursor-pointer">✕</button>
             </div>
 
@@ -534,11 +597,11 @@
     </div>
 
     <!-- MODAL: Editar mi propio perfil -->
-    <div id="modal-mi-perfil" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4">
+    <div id="modal-mi-perfil" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-mi-perfil-titulo">
+        <div class="modal-panel bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3">
-                <h3 class="font-bold text-gray-200 text-base flex items-center gap-2">👤 Mi Perfil</h3>
-                <button onclick="document.getElementById('modal-mi-perfil').classList.add('hidden')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
+                <h3 id="modal-mi-perfil-titulo" class="font-bold text-gray-200 text-base flex items-center gap-2">👤 Mi Perfil</h3>
+                <button onclick="cerrarModal('modal-mi-perfil')" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
             </div>
             <p id="mi-perfil-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 text-center"></p>
             <div>
@@ -559,21 +622,21 @@
                     <option value="Audio">🎛️ Audio</option>
                 </select>
             </div>
-            <button onclick="guardarMiPerfil()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer">
+            <button id="boton-guardar-perfil" onclick="guardarMiPerfil()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer">
                 💾 Guardar Cambios
             </button>
         </div>
     </div>
 
     <!-- MODAL: Publicar anuncio (solo Líder) -->
-    <div id="modal-anuncio" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4">
+    <div id="modal-anuncio" class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4 modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-anuncio-titulo">
+        <div class="modal-panel bg-[#161619] border border-[#222226] rounded-2xl p-6 w-full max-w-sm space-y-4">
             <div class="flex justify-between items-center border-b border-[#222226] pb-3">
-                <h3 class="font-bold text-gray-200 text-base flex items-center gap-2">📢 Nuevo Anuncio</h3>
+                <h3 id="modal-anuncio-titulo" class="font-bold text-gray-200 text-base flex items-center gap-2">📢 Nuevo Anuncio</h3>
                 <button onclick="cerrarModalAnuncio()" class="text-gray-500 hover:text-white text-lg cursor-pointer">✕</button>
             </div>
             <textarea id="anuncio-texto" rows="4" placeholder="Escribe el anuncio para todo el equipo..." class="w-full bg-[#1c1c21] border border-[#2a2a33] rounded-lg p-2.5 text-sm focus:outline-hidden focus:border-indigo-500 text-gray-200 resize-none"></textarea>
-            <button onclick="crearAnuncio()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer">
+            <button id="boton-publicar-anuncio" onclick="crearAnuncio()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition cursor-pointer">
                 📢 Publicar
             </button>
         </div>
@@ -595,6 +658,67 @@
         let mesCalendarioActual = new Date();
         let cacheEventos = [];
         let cacheSegmentosActuales = [];
+
+        // =========================================================================
+        // FASE 2 + FASE 4: Helpers centralizados de modal
+        // Reemplazan el patrón directo `classList.add/remove('hidden')` para dar:
+        // - Transición de entrada/salida (Fase 2)
+        // - Devolución de foco al elemento que abrió el modal, y foco inicial
+        //   dentro del modal al abrirlo (Fase 4 - accesibilidad de teclado)
+        // =========================================================================
+        let _elementoConFocoPrevio = null;
+
+        function abrirModal(id) {
+            const overlay = document.getElementById(id);
+            if (!overlay) return;
+            _elementoConFocoPrevio = document.activeElement;
+
+            overlay.classList.remove('hidden', 'cerrando');
+            requestAnimationFrame(() => {
+                overlay.classList.add('modal-visible');
+                const primerCampo = overlay.querySelector('input, textarea, select, button');
+                if (primerCampo) primerCampo.focus();
+            });
+        }
+
+        function cerrarModal(id) {
+            const overlay = document.getElementById(id);
+            if (!overlay) return;
+            overlay.classList.add('cerrando');
+            overlay.classList.remove('modal-visible');
+
+            const finalizar = () => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('cerrando');
+                if (_elementoConFocoPrevio && document.body.contains(_elementoConFocoPrevio)) {
+                    _elementoConFocoPrevio.focus();
+                }
+            };
+            setTimeout(finalizar, 180);
+        }
+
+        // Cierra el modal visible, o el sidebar mobile si está abierto, con la tecla Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const visible = document.querySelector('.modal-overlay.modal-visible');
+            if (visible) { cerrarModal(visible.id); return; }
+            const sidebar = document.getElementById('sidebar-app');
+            if (sidebar && !sidebar.classList.contains('-translate-x-full')) cerrarSidebarMobile();
+        });
+
+        // FASE 2: pone un botón en estado "cargando" para evitar doble clic / doble insert
+        // en acciones async. Devuelve una función para restaurarlo a su estado original.
+        function botonCargando(btn, textoCargando) {
+            if (!btn) return () => {};
+            const textoOriginal = btn.innerHTML;
+            const disabledOriginal = btn.disabled;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="btn-spinner"></span>${textoCargando || 'Guardando...'}`;
+            return () => {
+                btn.disabled = disabledOriginal;
+                btn.innerHTML = textoOriginal;
+            };
+        }
 
         window.addEventListener('DOMContentLoaded', async () => {
             verificarLiderEnRegistro();
@@ -943,19 +1067,24 @@
         function abrirModalAnuncio() {
             if (!esLider()) return;
             document.getElementById('anuncio-texto').value = '';
-            document.getElementById('modal-anuncio').classList.remove('hidden');
+            abrirModal('modal-anuncio');
         }
 
         function cerrarModalAnuncio() {
-            document.getElementById('modal-anuncio').classList.add('hidden');
+            cerrarModal('modal-anuncio');
         }
 
         async function crearAnuncio() {
             const contenido = document.getElementById('anuncio-texto').value.trim();
             if (!contenido) return;
-            await supabaseClient.from('anuncios').insert([{ contenido }]);
-            cerrarModalAnuncio();
-            await cargarAnunciosDesdeSupabase();
+            const restaurarBoton = botonCargando(document.getElementById('boton-publicar-anuncio'), 'Publicando...');
+            try {
+                await supabaseClient.from('anuncios').insert([{ contenido }]);
+                cerrarModalAnuncio();
+                await cargarAnunciosDesdeSupabase();
+            } finally {
+                restaurarBoton();
+            }
         }
 
         async function eliminarAnuncio(id) {
@@ -976,7 +1105,7 @@
             const optLider = document.getElementById('opt-lider-mi-perfil');
             optLider.style.display = (yaHayOtroLider && miPerfil.rol !== 'Líder') ? 'none' : 'block';
 
-            document.getElementById('modal-mi-perfil').classList.remove('hidden');
+            abrirModal('modal-mi-perfil');
         }
 
         async function guardarMiPerfil() {
@@ -993,19 +1122,24 @@
                 return;
             }
 
-            const { error } = await supabaseClient.from('miembros').update({ nombre, rol }).eq('id', miPerfil.id);
-            if (error) {
-                elError.innerText = error.message;
-                elError.classList.remove('hidden');
-                return;
-            }
+            const restaurarBoton = botonCargando(document.getElementById('boton-guardar-perfil'), 'Guardando...');
+            try {
+                const { error } = await supabaseClient.from('miembros').update({ nombre, rol }).eq('id', miPerfil.id);
+                if (error) {
+                    elError.innerText = error.message;
+                    elError.classList.remove('hidden');
+                    return;
+                }
 
-            document.getElementById('modal-mi-perfil').classList.add('hidden');
-            await sincronizarMiembrosYSelects();
+                cerrarModal('modal-mi-perfil');
+                await sincronizarMiembrosYSelects();
+            } finally {
+                restaurarBoton();
+            }
         }
 
         function abrirModalConfiguracion() {
-            document.getElementById('modal-configuracion').classList.remove('hidden');
+            abrirModal('modal-configuracion');
             renderizarListaConfigMiembros();
             cargarMetricaGeneralEquipo();
 
@@ -1259,7 +1393,7 @@
             document.getElementById('mg-total').innerText = total;
             document.getElementById('mg-eficiencia').innerText = eficiencia + '%';
         }
-        function cerrarModalConfiguracion() { document.getElementById('modal-configuracion').classList.add('hidden'); }
+        function cerrarModalConfiguracion() { cerrarModal('modal-configuracion'); }
 
         async function agregarMiembroEquipo() {
             const nombre = document.getElementById('config-nombre-miembro').value.trim();
@@ -1365,7 +1499,7 @@
         function mostrarVistaCalendario() {
             document.getElementById('vista-tablero').classList.add('hidden');
             document.getElementById('vista-calendario').classList.remove('hidden');
-            document.getElementById('modal-configuracion').classList.add('hidden');
+            cerrarModal('modal-configuracion');
             tableroActualId = null;
             cargarEspaciosDeTrabajo();
             cerrarSidebarMobile();
@@ -1405,7 +1539,9 @@
                 const eventosDelDia = cacheEventos.filter(e => e.fecha === fechaStr);
 
                 html += `
-                    <div onclick="abrirModalDia('${fechaStr}')" class="min-h-[64px] sm:min-h-[84px] p-1.5 rounded-lg border cursor-pointer transition hover:border-indigo-500/40 ${esHoy ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-[#222226] bg-[#161619]'} ${!esMesActual ? 'opacity-30' : ''}">
+                    <div onclick="abrirModalDia('${fechaStr}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirModalDia('${fechaStr}')}"
+                         tabindex="0" role="button" aria-label="${cursor.getDate()} de ${cursor.toLocaleDateString('es', {month:'long'})}${eventosDelDia.length ? `, ${eventosDelDia.length} evento(s)` : ''}"
+                         class="min-h-[64px] sm:min-h-[84px] p-1.5 rounded-lg border cursor-pointer transition hover:border-indigo-500/40 ${esHoy ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-[#222226] bg-[#161619]'} ${!esMesActual ? 'opacity-30' : ''}">
                         <p class="text-[10px] sm:text-xs font-semibold ${esHoy ? 'text-indigo-400' : 'text-gray-400'} mb-1">${cursor.getDate()}</p>
                         <div class="space-y-0.5">
                             ${eventosDelDia.slice(0, 2).map(e => `<div class="text-[8px] sm:text-[9px] bg-indigo-500/10 text-indigo-300 rounded px-1 py-0.5 truncate">${e.titulo}</div>`).join('')}
@@ -1424,17 +1560,19 @@
             document.getElementById('modal-dia-lista').innerHTML = eventosDelDia.length === 0
                 ? `<p class="text-xs text-gray-500 text-center py-4">Sin eventos este día.</p>`
                 : eventosDelDia.map(e => `
-                    <div onclick="abrirModalEvento('${e.id}')" class="bg-[#1c1c21] border border-[#222226] rounded-lg p-3 cursor-pointer hover:border-indigo-500/40 transition">
+                    <div onclick="abrirModalEvento('${e.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirModalEvento('${e.id}')}"
+                         tabindex="0" role="button" aria-label="Evento: ${(e.titulo || '').replace(/"/g, '&quot;')}"
+                         class="bg-[#1c1c21] border border-[#222226] rounded-lg p-3 cursor-pointer hover:border-indigo-500/40 transition">
                         <p class="text-xs font-semibold text-gray-200">${e.titulo}</p>
                         <p class="text-[10px] text-gray-400 mt-0.5">${e.hora ? '🕐 ' + e.hora.slice(0,5) : 'Sin hora definida'} ${e.ubicacion ? '· 📍 ' + e.ubicacion : ''}</p>
                         ${e.descripcion ? `<p class="text-[10px] text-gray-500 mt-1">${e.descripcion}</p>` : ''}
                     </div>`).join('');
             document.getElementById('modal-dia-boton-agregar').setAttribute('onclick', `abrirModalEvento(null, '${fechaStr}')`);
-            document.getElementById('modal-dia-eventos').classList.remove('hidden');
+            abrirModal('modal-dia-eventos');
         }
 
         function abrirModalEvento(id, fechaPrellenada) {
-            document.getElementById('modal-dia-eventos').classList.add('hidden');
+            cerrarModal('modal-dia-eventos');
             document.getElementById('evento-id').value = '';
             document.getElementById('evento-titulo').value = '';
             document.getElementById('evento-fecha').value = fechaPrellenada || '';
@@ -1457,7 +1595,7 @@
                     document.getElementById('modal-evento-titulo-header').innerText = '✏️ Editar Evento';
                 }
             }
-            document.getElementById('modal-evento').classList.remove('hidden');
+            abrirModal('modal-evento');
         }
 
         async function guardarEvento() {
@@ -1476,7 +1614,7 @@
                 await supabaseClient.from('eventos').insert([{ titulo, fecha, hora, ubicacion, descripcion, creado_por: OPERADOR_ACTUAL }]);
                 await notificarEventoATodos(titulo, fecha);
             }
-            document.getElementById('modal-evento').classList.add('hidden');
+            cerrarModal('modal-evento');
             renderizarCalendario();
         }
 
@@ -1499,10 +1637,19 @@
             const id = document.getElementById('evento-id').value;
             if (!id || !confirm('¿Eliminar este evento?')) return;
             await supabaseClient.from('eventos').delete().eq('id', id);
-            document.getElementById('modal-evento').classList.add('hidden');
+            cerrarModal('modal-evento');
             renderizarCalendario();
         }
 
+        // =========================================================================
+        // FASE 1: Carga eficiente del tablero
+        // Antes: 1 query de segmentos + (1 query de tareas + 1 query de conteo) POR columna.
+        // Con 5 columnas eso eran ~9-11 round-trips a Supabase solo para pintar el tablero.
+        // Ahora: 1 query de segmentos + 1 query de tareas activas (todo el tablero) +
+        // 1 query agregada de conteo para el crédito de finalizadas eliminadas = 3 queries fijas,
+        // sin importar cuántas columnas tenga el tablero.
+        // El sistema de tokens/cancelación y la deduplicación de segmentos se mantienen igual.
+        // =========================================================================
         async function ejecutarCargaColumnasYTasks() {
             if (!tableroActualId) return;
             const token = ++cargarColumnasToken;
@@ -1529,17 +1676,38 @@
                 return;
             }
 
+            const idsSegmentos = segments.map(s => s.id);
+            const idsFinalizado = segments.filter(col => col.nombre.toLowerCase().match(/(finalizado|listo|terminado)/)).map(s => s.id);
+
+            // Una sola query para TODAS las tareas activas del tablero (todas las columnas a la vez)
+            let queryTareas = supabaseClient.from('tareas').select('*')
+                .in('segmento_id', idsSegmentos).eq('eliminada', false).eq('archivada', false);
+            if (filtroActual === 'asignados') queryTareas = queryTareas.eq('responsable', OPERADOR_ACTUAL);
+            const { data: tareasRaw } = await queryTareas.order('posicion', { ascending: true });
+            if (token !== cargarColumnasToken || tableroActualId !== tableroId) return;
+
+            // Una sola query agregada para el crédito de tareas finalizadas que ya fueron borradas
+            if (idsFinalizado.length > 0) {
+                let queryCredito = supabaseClient.from('tareas').select('id', { count: 'exact', head: true })
+                    .in('segmento_id', idsFinalizado).eq('eliminada', true).eq('archivada', false);
+                if (filtroActual === 'asignados') queryCredito = queryCredito.eq('responsable', OPERADOR_ACTUAL);
+                const { count } = await queryCredito;
+                if (token !== cargarColumnasToken || tableroActualId !== tableroId) return;
+                totalFinalizado += count || 0;
+                totalGeneral += count || 0;
+            }
+
+            // Agrupa las tareas ya cargadas por columna (en memoria, sin más viajes a la red)
+            const tareasPorColumna = {};
+            (tareasRaw || []).forEach(t => {
+                if (!tareasPorColumna[t.segmento_id]) tareasPorColumna[t.segmento_id] = [];
+                tareasPorColumna[t.segmento_id].push(t);
+            });
+
             let htmlColumnas = '';
 
             for (const col of segments) {
-                if (token !== cargarColumnasToken || tableroActualId !== tableroId) return;
-                let query = supabaseClient.from('tareas').select('*').eq('segmento_id', col.id).eq('eliminada', false).eq('archivada', false);
-                if (filtroActual === 'asignados') query = query.eq('responsable', OPERADOR_ACTUAL);
-                
-                const { data: tasksRaw } = await query.order('posicion', { ascending: true });
-
-                // Ordena por fecha límite (las más próximas a vencer primero); sin fecha van al final.
-                const tasks = (tasksRaw || []).slice().sort((a, b) => {
+                const tasks = (tareasPorColumna[col.id] || []).slice().sort((a, b) => {
                     if (!a.fecha_entrega && !b.fecha_entrega) return 0;
                     if (!a.fecha_entrega) return 1;
                     if (!b.fecha_entrega) return -1;
@@ -1550,17 +1718,6 @@
                 const esPro = col.nombre.toLowerCase().match(/(proceso|haciendo)/);
                 const esHac = col.nombre.toLowerCase().match(/(hacer|pendiente)/);
 
-                // Aunque alguien borre una tarea ya finalizada, ese trabajo sigue contando en las métricas
-                // (no se muestra en el tablero, pero el crédito del trabajo hecho no se pierde).
-                if (esFin) {
-                    let queryCredito = supabaseClient.from('tareas').select('id', { count: 'exact', head: true })
-                        .eq('segmento_id', col.id).eq('eliminada', true).eq('archivada', false);
-                    if (filtroActual === 'asignados') queryCredito = queryCredito.eq('responsable', OPERADOR_ACTUAL);
-                    const { count } = await queryCredito;
-                    totalFinalizado += count || 0;
-                    totalGeneral += count || 0;
-                }
-
                 let htmlTareas = '';
                 if (tasks && tasks.length > 0) {
                     tasks.forEach(t => {
@@ -1569,61 +1726,10 @@
                         else if (esPro) totalEnProceso++;
                         else if (esHac) totalPorHacer++;
 
-                        // Calcula el estado de la fecha límite: vencida, próxima a vencer (≤2 días), o normal.
-                        let esVencida = false, proximaAVencer = false, diasRestantes = null;
-                        if (t.fecha_entrega) {
-                            const limite = new Date(t.fecha_entrega + 'T23:59:59');
-                            diasRestantes = Math.ceil((limite - hoy) / 86400000);
-                            if (!esFin) {
-                                if (limite < hoy) { esVencida = true; totalVencidas++; }
-                                else if (diasRestantes <= 2) { proximaAVencer = true; totalProximas++; }
-                            }
-                        }
-
-                        let bColor = "bg-gray-800 text-gray-400";
-                        if (t.prioridad === 'Alta') bColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                        if (t.prioridad === 'Urgente') bColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
-
-                        let chipFecha = '';
-                        if (t.fecha_entrega) {
-                            const [y, m, d] = t.fecha_entrega.split('-');
-                            const fechaLegible = `${d}/${m}`;
-                            let claseFecha = "bg-[#1c1c21] text-gray-400 border-[#26262b]";
-                            let textoFecha = `📅 ${fechaLegible}`;
-                            if (esVencida) {
-                                claseFecha = "bg-rose-500/10 text-rose-400 border-rose-500/20";
-                                textoFecha = `⚠️ Venció ${fechaLegible}`;
-                            } else if (proximaAVencer) {
-                                claseFecha = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                                textoFecha = diasRestantes === 0 ? `⏰ Hoy` : diasRestantes === 1 ? `⏰ Mañana` : `⏰ ${fechaLegible}`;
-                            }
-                            chipFecha = `<span class="text-[10px] font-medium px-2 py-0.5 rounded border ${claseFecha}">${textoFecha}</span>`;
-                        }
-
-                        const creadorEsLider = t.creado_por && cacheMiembros.some(m => m.nombre === t.creado_por && m.rol === 'Líder');
-
-                        htmlTareas += `
-                            <div id="tarea-${t.id}" draggable="${esFin ? 'false' : 'true'}" ondragstart="handleDragStart(event, '${t.id}')" ondragend="handleDragEnd(event)"
-                                 onclick="abrirModalEditarTarea(event, '${t.id}')"
-                                 data-id="${t.id}" data-segmento-id="${col.id}"
-                                 data-titulo="${(t.titulo || '').replace(/"/g, '&quot;')}"
-                                 data-prioridad="${t.prioridad}" data-responsable="${(t.responsable || '').replace(/"/g, '&quot;')}"
-                                 data-fecha="${t.fecha_entrega || ''}" data-miniatura="${(t.miniatura_url || '').replace(/"/g, '&quot;')}"
-                                 class="bg-[#161619] border ${creadorEsLider ? 'border-l-2 border-l-indigo-500 ' : ''}${esVencida ? 'border-rose-500/40 bg-rose-500/[0.02]' : proximaAVencer ? 'border-amber-500/30' : 'border-[#222226]'} p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3 ${esFin ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} select-none relative">
-                                <button onclick="event.stopPropagation(); eliminarTarea('${t.id}')" class="absolute top-3 right-3 text-gray-500 hover:text-rose-500 transition font-bold text-xs cursor-pointer opacity-0 group-hover:opacity-100 z-20">✕</button>
-                                ${t.miniatura_url ? `<img src="${t.miniatura_url}" class="w-full h-28 object-cover rounded-lg border border-[#222226]" draggable="false" />` : ''}
-                                <div class="flex items-start gap-1.5 pr-4">
-                                    ${creadorEsLider ? `<span class="text-[10px] shrink-0 mt-0.5" title="Asignada por la Líder">👑</span>` : ''}
-                                    <h4 class="font-medium text-xs text-gray-200 group-hover:text-white leading-tight">${t.titulo}</h4>
-                                </div>
-                                <div class="flex items-center justify-between pt-1 gap-2">
-                                    <span class="text-[9px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${bColor}">${t.prioridad}</span>
-                                    ${chipFecha}
-                                </div>
-                                <div class="flex items-center justify-between pt-1">
-                                    <span class="text-[10px] text-gray-400 font-medium bg-[#1c1c21] px-2 py-0.5 rounded border border-[#26262b]">👤 ${t.responsable}</span>
-                                </div>
-                            </div>`;
+                        const { html, esVencida, proximaAVencer } = renderizarTarjetaTarea(t, col, esFin, hoy);
+                        if (esVencida) totalVencidas++;
+                        else if (proximaAVencer) totalProximas++;
+                        htmlTareas += html;
                     });
                 } else {
                     htmlTareas = `<div class="text-[11px] text-gray-600 text-center py-6 border border-dashed border-[#1c1c21]/40 rounded-xl select-none empty-state-msg">No hay asignaciones</div>`;
@@ -1637,7 +1743,7 @@
                                 <h3 class="font-semibold text-xs tracking-wide text-gray-300">${col.nombre}</h3>
                                 <span class="bg-[#1c1c21] text-[10px] text-gray-400 px-2 py-0.5 rounded-full font-bold">${tasks ? tasks.length : 0}</span>
                             </div>
-                            <button onclick="abrirModalTarea('${col.id}')" class="text-gray-500 hover:text-white transition text-sm p-1 font-bold cursor-pointer">＋</button>
+                            <button onclick="abrirModalTarea('${col.id}')" class="text-gray-500 hover:text-white transition text-sm p-1 font-bold cursor-pointer" aria-label="Agregar tarea en ${col.nombre}">＋</button>
                         </div>
                         <div class="space-y-3 overflow-y-auto pr-1 flex-1 lista-tareas-contenedor">${htmlTareas}</div>
                     </div>`;
@@ -1646,6 +1752,71 @@
             if (token !== cargarColumnasToken || tableroActualId !== tableroId) return;
             contenedor.innerHTML = htmlColumnas;
             actualizarMetricas(totalPorHacer, totalEnProceso, totalFinalizado, totalVencidas, totalProximas, totalGeneral);
+        }
+
+        // Genera el HTML de una sola tarjeta de tarea. Extraído como función independiente
+        // para poder reutilizarlo en actualizaciones puntuales (ver handleDrop) sin tener
+        // que volver a renderizar el tablero completo.
+        function renderizarTarjetaTarea(t, col, esFin, hoy) {
+            hoy = hoy || new Date();
+
+            let esVencida = false, proximaAVencer = false, diasRestantes = null;
+            if (t.fecha_entrega) {
+                const limite = new Date(t.fecha_entrega + 'T23:59:59');
+                diasRestantes = Math.ceil((limite - hoy) / 86400000);
+                if (!esFin) {
+                    if (limite < hoy) esVencida = true;
+                    else if (diasRestantes <= 2) proximaAVencer = true;
+                }
+            }
+
+            let bColor = "bg-gray-800 text-gray-400";
+            if (t.prioridad === 'Alta') bColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+            if (t.prioridad === 'Urgente') bColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+
+            let chipFecha = '';
+            if (t.fecha_entrega) {
+                const [y, m, d] = t.fecha_entrega.split('-');
+                const fechaLegible = `${d}/${m}`;
+                let claseFecha = "bg-[#1c1c21] text-gray-400 border-[#26262b]";
+                let textoFecha = `📅 ${fechaLegible}`;
+                if (esVencida) {
+                    claseFecha = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                    textoFecha = `⚠️ Venció ${fechaLegible}`;
+                } else if (proximaAVencer) {
+                    claseFecha = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                    textoFecha = diasRestantes === 0 ? `⏰ Hoy` : diasRestantes === 1 ? `⏰ Mañana` : `⏰ ${fechaLegible}`;
+                }
+                chipFecha = `<span class="text-[10px] font-medium px-2 py-0.5 rounded border ${claseFecha}">${textoFecha}</span>`;
+            }
+
+            const creadorEsLider = t.creado_por && cacheMiembros.some(m => m.nombre === t.creado_por && m.rol === 'Líder');
+
+            const html = `
+                <div id="tarea-${t.id}" tabindex="0" draggable="${esFin ? 'false' : 'true'}" ondragstart="handleDragStart(event, '${t.id}')" ondragend="handleDragEnd(event)"
+                     onclick="abrirModalEditarTarea(event, '${t.id}')" onkeydown="if(event.key==='Enter'){abrirModalEditarTarea(event, '${t.id}')}"
+                     data-id="${t.id}" data-segmento-id="${col.id}"
+                     data-titulo="${(t.titulo || '').replace(/"/g, '&quot;')}"
+                     data-prioridad="${t.prioridad}" data-responsable="${(t.responsable || '').replace(/"/g, '&quot;')}"
+                     data-fecha="${t.fecha_entrega || ''}" data-miniatura="${(t.miniatura_url || '').replace(/"/g, '&quot;')}"
+                     class="tarea-card bg-[#161619] border ${creadorEsLider ? 'border-l-2 border-l-indigo-500 ' : ''}${esVencida ? 'border-rose-500/40 bg-rose-500/[0.02]' : proximaAVencer ? 'border-amber-500/30' : 'border-[#222226]'} p-4 rounded-xl shadow-xs hover:border-indigo-500/40 transition group space-y-3 ${esFin ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} select-none relative"
+                     role="button" aria-label="${(t.titulo || 'Tarea').replace(/"/g, '&quot;')}, prioridad ${t.prioridad}, asignado a ${t.responsable || 'sin asignar'}">
+                    <button onclick="event.stopPropagation(); eliminarTarea('${t.id}')" class="absolute top-3 right-3 text-gray-500 hover:text-rose-500 transition font-bold text-xs cursor-pointer opacity-0 group-hover:opacity-100 z-20" aria-label="Eliminar tarea">✕</button>
+                    ${t.miniatura_url ? `<img src="${t.miniatura_url}" class="w-full h-28 object-cover rounded-lg border border-[#222226]" draggable="false" alt="" />` : ''}
+                    <div class="flex items-start gap-1.5 pr-4">
+                        ${creadorEsLider ? `<span class="text-[10px] shrink-0 mt-0.5" title="Asignada por la Líder">👑</span>` : ''}
+                        <h4 class="font-medium text-xs text-gray-200 group-hover:text-white leading-tight">${t.titulo}</h4>
+                    </div>
+                    <div class="flex items-center justify-between pt-1 gap-2">
+                        <span class="text-[9px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${bColor}">${t.prioridad}</span>
+                        ${chipFecha}
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[10px] text-gray-400 font-medium bg-[#1c1c21] px-2 py-0.5 rounded border border-[#26262b]">👤 ${t.responsable}</span>
+                    </div>
+                </div>`;
+
+            return { html, esVencida, proximaAVencer };
         }
 
         function actualizarMetricas(porHacer, enProceso, finalizado, vencidas, proximas, total) {
@@ -1664,6 +1835,15 @@
         function handleDragEnd(e) { e.currentTarget.classList.remove('dragging'); }
         function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
         function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+        // FASE 1: Antes, al soltar la tarjeta se movía el nodo en el DOM (optimista) y
+        // luego se llamaba a cargarColumnasYTasks() completo, lo cual reconstruía TODO
+        // el tablero y anulaba esa ganancia optimista (parpadeo + pérdida de scroll).
+        // Ahora: se actualiza primero la tarjeta movida en el DOM (sus atributos pueden
+        // cambiar si entra o sale de la columna "Finalizado") y los contadores de las dos
+        // columnas involucradas, sin esperar a la red. Luego se llama a cargarColumnasYTasks()
+        // (el wrapper con cola) para reconciliar en segundo plano — gracias al sistema de
+        // tokens, si el usuario sigue interactuando esa reconciliación no pisa nada visible.
         async function handleDrop(e, colId) {
             e.preventDefault();
             const col = e.currentTarget; col.classList.remove('drag-over');
@@ -1671,17 +1851,66 @@
             if (!tId) return;
 
             const tDOM = document.getElementById(`tarea-${tId}`);
+            const colOrigenId = tDOM ? tDOM.dataset.segmentoId : null;
+            if (colOrigenId === colId) return; // soltó en la misma columna, nada que hacer
+
+            const colDestino = cacheSegmentosActuales.find(s => s.id === colId);
+            const esFinDestino = colDestino && colDestino.nombre.toLowerCase().match(/(finalizado|listo|terminado)/);
+
             if (tDOM) {
                 const dest = col.querySelector('.lista-tareas-contenedor');
                 const empty = dest.querySelector('.empty-state-msg'); if (empty) empty.remove();
-                dest.appendChild(tDOM);
+
+                const tareaPlano = {
+                    id: tId, titulo: tDOM.dataset.titulo, prioridad: tDOM.dataset.prioridad,
+                    responsable: tDOM.dataset.responsable, fecha_entrega: tDOM.dataset.fecha || null,
+                    miniatura_url: tDOM.dataset.miniatura || null,
+                    creado_por: tDOM.querySelector('[title="Asignada por la Líder"]') ? OPERADOR_ACTUAL : null
+                };
+                const { html } = renderizarTarjetaTarea(tareaPlano, colDestino || { nombre: '' }, esFinDestino, new Date());
+                const temp = document.createElement('div');
+                temp.innerHTML = html.trim();
+                const nuevaTarjeta = temp.firstElementChild;
+                dest.appendChild(nuevaTarjeta);
+                tDOM.remove();
+
+                actualizarContadorColumna(colOrigenId);
+                actualizarContadorColumna(colId);
             }
+
             await supabaseClient.from('tareas').update({ segmento_id: colId }).eq('id', tId);
             await cargarColumnasYTasks();
         }
 
+        // Actualiza solo el contador numérico de tareas visibles en el encabezado de una columna,
+        // sin reconstruir su contenido. Es una mejora visual inmediata; cargarColumnasYTasks()
+        // (con su sistema de tokens) confirma el estado real poco después.
+        function actualizarContadorColumna(colId) {
+            const columnaEl = document.querySelector(`[data-columna-id="${colId}"]`);
+            if (!columnaEl) return;
+            const lista = columnaEl.querySelector('.lista-tareas-contenedor');
+            const contador = columnaEl.querySelector('span.rounded-full');
+            if (lista && contador) {
+                const cantidad = lista.querySelectorAll('[id^="tarea-"]').length;
+                contador.innerText = cantidad;
+                const empty = lista.querySelector('.empty-state-msg');
+                if (cantidad === 0 && !empty) {
+                    lista.innerHTML = `<div class="text-[11px] text-gray-600 text-center py-6 border border-dashed border-[#1c1c21]/40 rounded-xl select-none empty-state-msg">No hay asignaciones</div>`;
+                }
+            }
+        }
+
         async function eliminarTarea(id) {
             if(!confirm("¿Eliminar asignación?")) return;
+
+            const tDOM = document.getElementById(`tarea-${id}`);
+
+            // Animación de salida (Fase 2) antes de quitar el nodo del DOM
+            if (tDOM) {
+                tDOM.classList.add('saliendo');
+                setTimeout(() => { tDOM.remove(); }, 150);
+            }
+
             await supabaseClient.from('tareas').update({
                 eliminada: true,
                 eliminada_por: OPERADOR_ACTUAL,
@@ -1723,7 +1952,7 @@
             document.getElementById('form-fecha').value = '';
             document.getElementById('modal-tarea-titulo-header').innerText = '📝 Nueva Asignación';
             document.getElementById('boton-guardar-tarea').innerText = '🚀 Desplegar Asignación';
-            document.getElementById('modal-tarea').classList.remove('hidden');
+            abrirModal('modal-tarea');
         }
 
         function abrirModalEditarTarea(e, id) {
@@ -1746,7 +1975,7 @@
             else { preview.classList.add('hidden'); }
             document.getElementById('modal-tarea-titulo-header').innerText = '✏️ Editar Asignación';
             document.getElementById('boton-guardar-tarea').innerText = '💾 Guardar Cambios';
-            document.getElementById('modal-tarea').classList.remove('hidden');
+            abrirModal('modal-tarea');
         }
 
         // Sube la imagen elegida al bucket "miniaturas" de Supabase Storage y guarda la URL pública.
@@ -1785,7 +2014,7 @@
             estado.innerText = '✅ Imagen lista';
         }
 
-        function cerrarModalTarea() { document.getElementById('modal-tarea').classList.add('hidden'); document.getElementById('form-titulo').value = ''; }
+        function cerrarModalTarea() { cerrarModal('modal-tarea'); document.getElementById('form-titulo').value = ''; }
 
         async function guardarTarea() {
             const tareaId = document.getElementById('form-tarea-id').value;
@@ -1798,43 +2027,49 @@
 
             if(!titulo) return alert("Escribe un título.");
 
+            const restaurarBoton = botonCargando(document.getElementById('boton-guardar-tarea'), 'Guardando...');
+
             const datosTarea = { segmento_id: segId, titulo, prioridad, responsable: resp, miniatura_url: mini || null, fecha_entrega: fecha || null };
             const miembroAsignado = cacheMiembros.find(m => m.nombre === resp);
 
             if (!tareaId) datosTarea.creado_por = OPERADOR_ACTUAL;
 
-            if (tareaId) {
-                // Modo edición: ver si el responsable cambió antes de actualizar
-                const card = document.getElementById(`tarea-${tareaId}`);
-                const responsableAnterior = card ? card.dataset.responsable : null;
+            try {
+                if (tareaId) {
+                    // Modo edición: ver si el responsable cambió antes de actualizar
+                    const card = document.getElementById(`tarea-${tareaId}`);
+                    const responsableAnterior = card ? card.dataset.responsable : null;
 
-                await supabaseClient.from('tareas').update(datosTarea).eq('id', tareaId);
+                    await supabaseClient.from('tareas').update(datosTarea).eq('id', tareaId);
 
-                if (responsableAnterior !== resp && miembroAsignado && miembroAsignado.user_id) {
-                    await supabaseClient.from('notificaciones').insert([{
-                        miembro_user_id: miembroAsignado.user_id,
-                        tarea_id: tareaId,
-                        tarea_titulo: titulo
-                    }]);
+                    if (responsableAnterior !== resp && miembroAsignado && miembroAsignado.user_id) {
+                        await supabaseClient.from('notificaciones').insert([{
+                            miembro_user_id: miembroAsignado.user_id,
+                            tarea_id: tareaId,
+                            tarea_titulo: titulo
+                        }]);
+                    }
+                } else {
+                    // Modo creación
+                    const { data: nuevaTarea } = await supabaseClient.from('tareas').insert([datosTarea]).select();
+                    if (nuevaTarea && nuevaTarea[0] && miembroAsignado && miembroAsignado.user_id) {
+                        await supabaseClient.from('notificaciones').insert([{
+                            miembro_user_id: miembroAsignado.user_id,
+                            tarea_id: nuevaTarea[0].id,
+                            tarea_titulo: titulo
+                        }]);
+                    }
                 }
-            } else {
-                // Modo creación
-                const { data: nuevaTarea } = await supabaseClient.from('tareas').insert([datosTarea]).select();
-                if (nuevaTarea && nuevaTarea[0] && miembroAsignado && miembroAsignado.user_id) {
-                    await supabaseClient.from('notificaciones').insert([{
-                        miembro_user_id: miembroAsignado.user_id,
-                        tarea_id: nuevaTarea[0].id,
-                        tarea_titulo: titulo
-                    }]);
-                }
+
+                cerrarModalTarea();
+                await cargarColumnasYTasks();
+            } finally {
+                restaurarBoton();
             }
-
-            cerrarModalTarea();
-            await cargarColumnasYTasks();
         }
 
-        function abrirModalEspacio() { document.getElementById('modal-espacio').classList.remove('hidden'); }
-        function cerrarModalEspacio() { document.getElementById('modal-espacio').classList.add('hidden'); document.getElementById('espacio-titulo').value = ''; }
+        function abrirModalEspacio() { abrirModal('modal-espacio'); }
+        function cerrarModalEspacio() { cerrarModal('modal-espacio'); document.getElementById('espacio-titulo').value = ''; }
         
         async function guardarEspacio() {
             const titulo = document.getElementById('espacio-titulo').value.trim();
